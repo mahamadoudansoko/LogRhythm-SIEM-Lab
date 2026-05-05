@@ -60,7 +60,7 @@ The diagram below shows the standard LogRhythm SIEM component topology and data 
 ### Lab-Specific Architecture — What We Built
 
 The diagram below maps the exact topology of this lab to the official architecture above — showing both machines, custom log sources, PowerShell simulation scripts, and each detection rule with its MITRE technique:
-![Lab-Specific Architecture](screenshots/architecture/logrhythm_architecture.svg)
+![Lab-Specific Architecture](screenshots/00-architecture/logrhythm_architecture.svg)
 ---
 
 ## 📋 Table of Contents
