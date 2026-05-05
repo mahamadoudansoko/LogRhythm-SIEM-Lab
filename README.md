@@ -41,7 +41,7 @@ The diagram below shows the standard LogRhythm SIEM component topology and data 
 
 <div align="center">
 
-![LogRhythm Architecture](screenshots/architecture/logrhythm_architecture.png)
+![LogRhythm Architecture](screenshots/00-architecture/logrhythm_architecture.png)
 
 </div>
 
