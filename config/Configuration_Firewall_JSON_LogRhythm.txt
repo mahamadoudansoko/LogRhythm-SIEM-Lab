@@ -1,0 +1,412 @@
+============================================================================
+    CONFIGURATION LOGRHYTHM - INTÉGRATION LOGS FIREWALL JSON
+    Guide complet de A à Z
+============================================================================
+
+AUTEUR  : Assistant Claude / Anthropic
+DATE    : Avril 2026
+VERSION : 1.0
+OBJECTIF: Intégrer des logs Firewall au format JSON dans LogRhythm
+
+============================================================================
+  PARTIE 0 : FORMAT DES LOGS JSON
+============================================================================
+
+Chaque ligne du fichier firewall_logs.json est un objet JSON indépendant :
+
+{"timestamp":"2026-04-03T08:00:01Z","firewall":"FW-CORE-01","action":"ALLOW",
+ "protocol":"TCP","src_ip":"10.0.1.10","src_port":51234,"dst_ip":"203.0.113.5",
+ "dst_port":443,"interface":"eth0","direction":"outbound","zone":"LAN",
+ "policy":"CORP-INTERNET","bytes":1420,"packets":12,"duration_sec":30,
+ "session_id":"A1B2C3D4","service":"HTTPS"}
+
+Champs extraits (17 champs) :
+--------------------------------------------------------------
+Champ JSON      | Variable REGEX         | Champ LogRhythm
+----------------|------------------------|-------------------
+timestamp       | session_start_time     | Date/Time
+firewall        | known_host             | Known Host
+action          | result                 | Result
+protocol        | protname               | Protocol Name
+src_ip          | sip                    | Source IP
+src_port        | sport                  | Source Port
+dst_ip          | dip                    | Destination IP
+dst_port        | dport                  | Destination Port
+interface       | tag2                   | Tag2
+direction       | vmid                   | VMware ID (Direction)
+zone            | domainorigin           | Domain Origin
+policy          | policy                 | Policy
+bytes           | size                   | Object Size (bytes)
+packets         | quantity               | Quantity
+duration_sec    | duration               | Duration
+session_id      | session                | Session
+service         | process                | Process Name
+--------------------------------------------------------------
+
+============================================================================
+  ÉTAPE 1 : CRÉER LE LOG SOURCE TYPE (Custom Log Source Type)
+============================================================================
+
+CHEMIN : Deployment Manager → Log Source Types
+
+ACTION → Clic droit dans le panneau droit → "New..."
+
+Remplir :
+  ┌─────────────────────────────────────────────────────────┐
+  │  Name :         Flat File - Firewall JSON               │
+  │  Abbreviation : FF-FW-JSON                              │
+  │  Log Source Family : Custom                             │
+  │  Brief Description : Firewall logs au format JSON       │
+  │                       (1 JSON par ligne)                │
+  │  Status : Active                                        │
+  └─────────────────────────────────────────────────────────┘
+
+Cliquer OK → Sauvegarder.
+
+============================================================================
+  ÉTAPE 2 : CRÉER LE LOG SOURCE (Log Source)
+============================================================================
+
+CHEMIN : Deployment Manager → Log Sources
+
+ACTION → Clic droit dans la liste → "New..."
+
+Onglet "General" :
+  ┌─────────────────────────────────────────────────────────┐
+  │  Name :          Firewall JSON Logs                     │
+  │  Log Source Type : Flat File - Firewall JSON            │
+  │  Entity :        (votre entité, ex: Primary Site)       │
+  │  Host :          (votre machine locale, ex: localhost)  │
+  │  Status :        Active                                 │
+  └─────────────────────────────────────────────────────────┘
+
+Onglet "Collection" :
+  ┌─────────────────────────────────────────────────────────┐
+  │  Collection Method : File                               │
+  │  File Path :        C:\LogRhythmLogs\firewall_logs.json │
+  │  Character Encoding : UTF-8                             │
+  │  Date Parsing Format : Auto-detect                      │
+  └─────────────────────────────────────────────────────────┘
+
+Onglet "Log Processing" :
+  ┌─────────────────────────────────────────────────────────┐
+  │  MPE Policy :    Firewall JSON Policy  ← (créer après)  │
+  └─────────────────────────────────────────────────────────┘
+
+→ Cliquer OK. (Nous reviendrons assigner la Policy après l'avoir créée.)
+
+============================================================================
+  ÉTAPE 3 : CRÉER LE MPE POLICY
+============================================================================
+
+CHEMIN : Deployment Manager → Log Processing Policies
+
+ACTION → Clic droit → "New..."
+
+  ┌─────────────────────────────────────────────────────────┐
+  │  Policy Name :  Firewall JSON Policy                    │
+  │  Policy Type :  Custom                                  │
+  │  Status :       Active                                  │
+  │  Description :  Parse les logs Firewall JSON ligne/ligne │
+  └─────────────────────────────────────────────────────────┘
+
+→ Cliquer OK pour créer la Policy vide.
+→ Ensuite ouvrir la Policy pour y ajouter la règle (étape suivante).
+
+============================================================================
+  ÉTAPE 4 : CRÉER LA RÈGLE MPE (Base-rule + Sub-rules)
+============================================================================
+
+CHEMIN : Deployment Manager → Log Processing Policies
+         → Double-clic sur "Firewall JSON Policy"
+         → Clic droit dans la liste des règles → "New Rule..."
+
+-----------------------------------------------------------------------
+  4A. BASE-RULE
+-----------------------------------------------------------------------
+
+Onglet "General" :
+  ┌─────────────────────────────────────────────────────────┐
+  │  Rule Name :    Firewall JSON Rule                      │
+  │  Common Event : Firewall Traffic                        │
+  │  Rule Status :  Production                              │
+  │  Brief Desc :   Parse les 17 champs JSON du firewall    │
+  └─────────────────────────────────────────────────────────┘
+
+Onglet "Base-rule Regular Expression" :
+  Copiez-collez EXACTEMENT la regex ci-dessous (1 seule ligne, pas d'espace avant/après) :
+
+─────────────────────────────────────────────────────────────────────────
+^\{"timestamp":"(?<session_start_time>[^"]+)","firewall":"(?<known_host>[^"]+)","action":"(?<result>[^"]+)","protocol":"(?<protname>[^"]+)","src_ip":"(?<sip>[^"]+)","src_port":(?<sport>\d+),"dst_ip":"(?<dip>[^"]+)","dst_port":(?<dport>\d+),"interface":"(?<tag2>[^"]+)","direction":"(?<vmid>[^"]+)","zone":"(?<domainorigin>[^"]+)","policy":"(?<policy>[^"]+)","bytes":(?<size>\d+),"packets":(?<quantity>\d+),"duration_sec":(?<duration>\d+),"session_id":"(?<session>[^"]+)","service":"(?<process>[^"]+)"\}
+─────────────────────────────────────────────────────────────────────────
+
+Onglet "Log Message Source Type Associations" :
+  → Cochez : Flat File - Firewall JSON
+
+→ Cliquer "Save" pour sauvegarder la Base-rule.
+
+-----------------------------------------------------------------------
+  4B. SUB-RULE 1 : Firewall Allow Rule
+-----------------------------------------------------------------------
+
+Dans la Base-rule → Onglet "Sub-Rules" → Clic droit → "New Sub-Rule..."
+
+  ┌───────────────────────────────────────────────────────────────────┐
+  │  Name :           Firewall Allow Rule                             │
+  │  Classification : Traffic                                         │
+  │  Common Event :   Firewall Traffic Allow                          │
+  │  Sort Order :     1                                               │
+  │  Rule Status :    Production                                      │
+  │  Risk Rating :    0                                               │
+  │  False Alarm :    0                                               │
+  │  Forward :        ✓ (coché)                                       │
+  │                                                                   │
+  │  Tag2 Field (interface) Regex : =ALLOW                            │
+  │  (Dans l'éditeur de sub-rule, filtre sur le champ "result")       │
+  │                                                                   │
+  │  REGEX de la sub-rule (Base-rule Tag2) :                          │
+  │  .*"action":"ALLOW".*                                             │
+  └───────────────────────────────────────────────────────────────────┘
+
+NOTE: Dans LogRhythm, la Sub-rule hérite de la Base-rule.
+      Le filtre se fait sur le résultat parsé :
+      → Champ "Result" contient : ALLOW
+
+-----------------------------------------------------------------------
+  4C. SUB-RULE 2 : Firewall Deny Rule
+-----------------------------------------------------------------------
+
+  ┌───────────────────────────────────────────────────────────────────┐
+  │  Name :           Firewall Deny Rule                              │
+  │  Classification : Traffic                                         │
+  │  Common Event :   Firewall Traffic Deny                           │
+  │  Sort Order :     2                                               │
+  │  Rule Status :    Production                                      │
+  │  Risk Rating :    4                                               │
+  │  False Alarm :    1                                               │
+  │  Forward :        ✓ (coché)                                       │
+  │                                                                   │
+  │  Filtre : Result contient : DENY                                  │
+  └───────────────────────────────────────────────────────────────────┘
+
+-----------------------------------------------------------------------
+  4D. SUB-RULE 3 : Firewall Drop Rule
+-----------------------------------------------------------------------
+
+  ┌───────────────────────────────────────────────────────────────────┐
+  │  Name :           Firewall Drop Rule                              │
+  │  Classification : Traffic                                         │
+  │  Common Event :   Firewall Traffic Deny                           │
+  │  Sort Order :     3                                               │
+  │  Rule Status :    Production                                      │
+  │  Risk Rating :    3                                               │
+  │  False Alarm :    1                                               │
+  │  Forward :        ✓ (coché)                                       │
+  │                                                                   │
+  │  Filtre : Result contient : DROP                                  │
+  └───────────────────────────────────────────────────────────────────┘
+
+-----------------------------------------------------------------------
+  4E. SUB-RULE 4 : Firewall Inbound Deny
+-----------------------------------------------------------------------
+
+  ┌───────────────────────────────────────────────────────────────────┐
+  │  Name :           Firewall Inbound Deny                           │
+  │  Classification : Attack                                          │
+  │  Common Event :   Firewall Traffic Deny                           │
+  │  Sort Order :     4                                               │
+  │  Rule Status :    Production                                      │
+  │  Risk Rating :    5                                               │
+  │  False Alarm :    0                                               │
+  │  Forward :        ✓ (coché)                                       │
+  │                                                                   │
+  │  Filtre :                                                         │
+  │    Result contient : DENY                                         │
+  │    ET direction contient : inbound                                │
+  └───────────────────────────────────────────────────────────────────┘
+
+============================================================================
+  RÉCAPITULATIF DES SUB-RULES
+============================================================================
+
+SortOrder | Name                 | Common Event            | Risk
+----------|----------------------|-------------------------|------
+    1     | Firewall Allow Rule  | Firewall Traffic Allow  |  0
+    2     | Firewall Deny Rule   | Firewall Traffic Deny   |  4
+    3     | Firewall Drop Rule   | Firewall Traffic Deny   |  3
+    4     | Firewall Inbound     | Firewall Traffic Deny   |  5
+          | Deny                 |                         |
+
+============================================================================
+  ÉTAPE 5 : ASSIGNER LA POLICY AU LOG SOURCE
+============================================================================
+
+CHEMIN : Deployment Manager → Log Sources
+         → Double-clic sur "Firewall JSON Logs"
+         → Onglet "Log Processing"
+
+  ┌─────────────────────────────────────────────────────────┐
+  │  MPE Policy : Firewall JSON Policy    ← SÉLECTIONNER    │
+  └─────────────────────────────────────────────────────────┘
+
+→ Cliquer OK → Cliquer "Deploy" (bouton Deploy en haut)
+
+============================================================================
+  ÉTAPE 6 : DÉPLOYER ET REDÉMARRER
+============================================================================
+
+1. Cliquer sur le bouton "Deploy" dans Deployment Manager
+2. Redémarrer le service :
+   Ouvrir PowerShell en ADMIN et exécuter :
+
+   Restart-Service -Name "LogRhythm System Monitor" -Force
+
+   OU via Services.msc :
+   Services Windows → "LogRhythm System Monitor" → Restart
+
+============================================================================
+  ÉTAPE 7 : GÉNÉRER DES LOGS ET VÉRIFIER
+============================================================================
+
+1. Lancer : Lancer-Firewall-JSON.bat (double-clic)
+2. Choisir : Option 1 (logs normaux - 20 logs)
+3. Attendre 2-3 minutes
+4. Ouvrir LogRhythm Console → Investigate
+5. Chercher :
+   - Log Source : Firewall JSON Logs
+   - Common Event : Firewall Traffic Allow / Firewall Traffic Deny
+6. Vérifier que TOUS les champs sont remplis :
+   ✓ Source IP
+   ✓ Destination IP
+   ✓ Source Port
+   ✓ Destination Port
+   ✓ Protocol
+   ✓ Result (ALLOW / DENY / DROP)
+   ✓ Known Host (nom du firewall)
+   ✓ Session ID
+   ✓ Process Name (service)
+
+============================================================================
+  ÉTAPE 8 : CRÉER LES ALARMES AI ENGINE
+============================================================================
+
+CHEMIN : Deployment Manager → AI Engine → Rules → Clic droit → New Rule
+
+-----------------------------------------------------------------------
+  ALARME 1 : Port Scan Detection
+-----------------------------------------------------------------------
+
+Onglet General :
+  Name :        Port Scan Detection - FW
+  Description : Détecte un scan de ports (>30 DENY même src en 2 min)
+  Status :      Production
+  Priority :    8
+
+Onglet Filter :
+  Common Event : Firewall Traffic Deny
+  Time Frame :   2 minutes
+  Count :        >= 30
+  Group By :     Source IP
+
+Onglet Response :
+  ☑ Generate Alarm
+  Alarm Name :  Port Scan Detected
+  Summary :     Port scan detected from {sourceip} - {count} blocked connections
+  RBP :         85
+
+-----------------------------------------------------------------------
+  ALARME 2 : Trafic Bloqué Massif (DDoS / Flood)
+-----------------------------------------------------------------------
+
+Onglet General :
+  Name :        Massive Blocked Traffic - FW
+  Description : Détecte un volume anormal de trafic bloqué (DDoS)
+  Status :      Production
+  Priority :    9
+
+Onglet Filter :
+  Common Event : Firewall Traffic Deny
+  Time Frame :   5 minutes
+  Count :        >= 100
+  Group By :     (aucun - tous confondus)
+
+Onglet Response :
+  ☑ Generate Alarm
+  Alarm Name :  Massive Blocked Traffic
+  Summary :     DDoS/Flood detected - {count} denied connections in 5 minutes
+  RBP :         90
+
+-----------------------------------------------------------------------
+  ALARME 3 : Accès Port Sensible (RDP/Telnet/SMB)
+-----------------------------------------------------------------------
+
+Onglet General :
+  Name :        Suspicious Port Access - FW
+  Description : Détecte accès sur ports sensibles (RDP 3389, Telnet 23, SMB 445)
+  Status :      Production
+  Priority :    7
+
+Onglet Filter :
+  Common Event : Firewall Traffic Deny
+  Time Frame :   5 minutes
+  Count :        >= 3
+  Destination Port : IN (3389, 23, 445, 21, 1433, 3306)
+  Group By :     Source IP
+
+Onglet Response :
+  ☑ Generate Alarm
+  Alarm Name :  Suspicious Port Access
+  Summary :     Suspicious access to sensitive ports from {sourceip}
+  RBP :         75
+
+============================================================================
+  MAPPING REGEX → CHAMPS LOGRHYTHM (RÉFÉRENCE COMPLÈTE)
+============================================================================
+
+Variable REGEX       | Champ LogRhythm        | Colonne JSON
+---------------------|------------------------|------------------
+session_start_time   | Date/Time              | timestamp
+known_host           | Known Host             | firewall
+result               | Result                 | action
+protname             | Protocol               | protocol
+sip                  | Source IP              | src_ip
+sport                | Source Port            | src_port
+dip                  | Destination IP         | dst_ip
+dport                | Destination Port       | dst_port
+tag2                 | Tag2 (Interface)       | interface
+vmid                 | Direction (VMware ID)  | direction
+domainorigin         | Domain Origin (Zone)   | zone
+policy               | Policy                 | policy
+size                 | Object Size            | bytes
+quantity             | Quantity               | packets
+duration             | Duration               | duration_sec
+session              | Session                | session_id
+process              | Process Name           | service
+
+============================================================================
+  DÉPANNAGE
+============================================================================
+
+PROBLÈME : Les logs n'apparaissent pas dans Investigator
+SOLUTIONS :
+  1. Vérifier que le fichier contient bien des lignes JSON
+     → Get-Content C:\LogRhythmLogs\firewall_logs.json -Tail 5
+  2. Vérifier que le service est démarré
+     → Get-Service "LogRhythm System Monitor"
+  3. Vérifier l'assignation MPE Policy au Log Source
+  4. Cliquer sur Deploy après toute modification
+  5. Redémarrer le service
+
+PROBLÈME : Les champs ne sont pas parsés (tous vides sauf timestamp)
+SOLUTIONS :
+  1. Vérifier la Base-rule regex (copier-coller à nouveau)
+  2. Tester dans "Test Center" avec une ligne JSON exemple
+  3. Vérifier l'association Log Source Type dans la règle
+
+PROBLÈME : Regex ne matche pas
+TEST : Coller cette ligne dans Test Center et vérifier :
+{"timestamp":"2026-04-03T08:00:01Z","firewall":"FW-CORE-01","action":"ALLOW","protocol":"TCP","src_ip":"10.0.1.10","src_port":51234,"dst_ip":"203.0.113.5","dst_port":443,"interface":"eth0","direction":"outbound","zone":"LAN","policy":"CORP-INTERNET","bytes":1420,"packets":12,"duration_sec":30,"session_id":"A1B2C3D4","service":"HTTPS"}
+
+============================================================================
+  FIN DU GUIDE
+============================================================================

@@ -1,0 +1,349 @@
+# ============================================================================
+# CONFIGURATION LOGRHYTHM - CSV ENRICHI (12 COLONNES)
+# ============================================================================
+# Version : 2.0
+# Format  : CSV avec 12 colonnes (compatible mapping Windows Event XML)
+# ============================================================================
+
+## FORMAT CSV ENRICHI
+## ==================
+
+En-tête CSV (12 colonnes) :
+DateTime,EventType,SubjectUser,SubjectDomain,TargetUser,TargetDomain,SourceIP,HostName,ProcessName,ProcessID,SessionID,Status
+
+Exemple de ligne :
+2026-04-01 18:00:01,Login,mahamadou.dansoko,WIN-5JRTS511MJA,mahamadou.dansoko,WIN-5JRTS511MJA,10.254.75.189,WIN-5JRTS511MJA,winlogon.exe,1234,0x4cbd6,Success
+
+
+## DESCRIPTION DES COLONNES
+## =========================
+
+1.  DateTime        : Timestamp au format YYYY-MM-DD HH:MM:SS
+2.  EventType       : Type d'événement (Login ou Logout)
+3.  SubjectUser     : Utilisateur source (celui qui fait l'action)
+4.  SubjectDomain   : Domaine de l'utilisateur source
+5.  TargetUser      : Utilisateur cible (sur qui l'action est faite)
+6.  TargetDomain    : Domaine de l'utilisateur cible
+7.  SourceIP        : Adresse IP source
+8.  HostName        : Nom de l'hôte/machine
+9.  ProcessName     : Nom du processus (ex: winlogon.exe, lsass.exe)
+10. ProcessID       : ID du processus
+11. SessionID       : ID de session au format hexadécimal (ex: 0x4cbd6)
+12. Status          : Résultat (Success ou Failed)
+
+
+## BASE-RULE REGULAR EXPRESSION
+## =============================
+
+Expression régulière complète (à copier dans LogRhythm Rule Builder) :
+
+^(?<session_start_time>\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}),(?<action>[^,]+),(?<login>[^,]+),(?<origin_domain>[^,]+),(?<account>[^,]+),(?<impacted_domain>[^,]+),(?<sip>[^,]+),(?<known_host>[^,]+),(?<process>[^,]+),(?<processid>[^,]+),(?<session>[^,]+),(?<result>[^,\r\n]+)
+
+
+## MAPPING DES GROUPES CAPTURÉS
+## ==============================
+
+Variable Regex          → Champ LogRhythm           → Description
+-----------------         --------------------         --------------
+session_start_time      → DateTime                   → Timestamp de l'événement
+action                  → EventType                  → Login ou Logout
+login                   → User (Origin)              → Utilisateur source
+origin_domain           → Domain Origin              → Domaine source
+account                 → User (Impacted)            → Utilisateur cible
+impacted_domain         → Domain Impacted            → Domaine cible
+sip                     → Source IP                  → Adresse IP source
+known_host              → Known Host                 → Nom de l'hôte
+process                 → Process Name               → Nom du processus
+processid               → Process ID                 → ID du processus
+session                 → Session                    → ID de session
+result                  → Result                     → Success/Failed
+
+
+## SUB-RULES (4 RÈGLES)
+## =====================
+
+### SUB-RULE 1 : LOGIN SUCCESS
+### ---------------------------
+
+Nom de la Sub-rule      : Login Success Rule
+Expression Régulière    : ,Login,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,Success
+Classification          : Authentication
+Common Event            : Logon-Success
+Direction               : Unknown → Local
+Priority                : 5
+
+Description : Détecte les connexions réussies
+
+
+### SUB-RULE 2 : LOGIN FAILED
+### --------------------------
+
+Nom de la Sub-rule      : Login Failed Rule
+Expression Régulière    : ,Login,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,Failed
+Classification          : Authentication
+Common Event            : Logon-Failed
+Direction               : Unknown → Local
+Priority                : 7
+
+Description : Détecte les échecs de connexion (potentielles attaques)
+
+
+### SUB-RULE 3 : LOGOUT SUCCESS
+### ----------------------------
+
+Nom de la Sub-rule      : Logout Success Rule
+Expression Régulière    : ,Logout,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,Success
+Classification          : Authentication
+Common Event            : Logoff-Success
+Direction               : Local → Unknown
+Priority                : 3
+
+Description : Détecte les déconnexions réussies
+
+
+### SUB-RULE 4 : LOGOUT FAILED
+### ---------------------------
+
+Nom de la Sub-rule      : Logout Failed Rule
+Expression Régulière    : ,Logout,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,Failed
+Classification          : Authentication
+Common Event            : Logoff-Failed
+Direction               : Local → Unknown
+Priority                : 5
+
+Description : Détecte les échecs de déconnexion (anormal)
+
+
+## PROCÉDURE D'INSTALLATION
+## =========================
+
+### ÉTAPE 1 : CRÉER/MODIFIER LA POLICY
+### ------------------------------------
+
+1. Ouvrir LogRhythm Console
+2. Aller dans Deployment Manager
+3. Onglet "Log Processing Policies"
+4. Double-cliquer sur "Auth Logs CSV Policy" (ou créer une nouvelle)
+
+
+### ÉTAPE 2 : CONFIGURER LA BASE-RULE
+### -----------------------------------
+
+1. Cliquer sur l'onglet "Base-rule Regular Expression"
+2. Coller la Base-rule dans le champ (voir ci-dessus)
+3. Cliquer sur "Save"
+
+
+### ÉTAPE 3 : AJOUTER LES SUB-RULES
+### --------------------------------
+
+Pour chaque sub-rule (1 à 4) :
+
+1. Cliquer sur l'onglet "Sub-Rules"
+2. Cliquer sur "Add"
+3. Remplir les champs :
+   - Sub-rule Name            : [Nom de la sub-rule]
+   - Sub-rule Regex           : [Expression régulière]
+   - Classification           : Authentication
+   - Common Event             : [Voir détail sub-rule]
+   - Direction                : [Voir détail sub-rule]
+4. Cliquer sur "OK"
+5. Répéter pour les 3 autres sub-rules
+
+
+### ÉTAPE 4 : SAUVEGARDER ET DÉPLOYER
+### -----------------------------------
+
+1. Cliquer sur "Save" pour enregistrer la policy
+2. Cliquer sur "OK" pour fermer le Rule Builder
+3. Dans Deployment Manager, cliquer sur "Deploy"
+4. Attendre la synchronisation (2-3 minutes)
+
+
+### ÉTAPE 5 : REDÉMARRER LE SERVICE
+### ---------------------------------
+
+1. Ouvrir "Services" Windows
+2. Trouver "LogRhythm System Monitor"
+3. Clic droit → Restart
+4. Attendre le redémarrage (1-2 minutes)
+
+
+### ÉTAPE 6 : VÉRIFIER LE LOG SOURCE
+### ----------------------------------
+
+1. Aller dans Deployment Manager → Log Sources
+2. Vérifier que votre Log Source pointe vers : C:\LogRhythmLogs\auth_logs
+3. Vérifier que la Policy "Auth Logs CSV Policy" est bien assignée
+4. Vérifier que le Log Source est "Enabled"
+
+
+## TESTS ET VALIDATION
+## ====================
+
+### TEST 1 : DANS LE RULE BUILDER
+### -------------------------------
+
+1. Ouvrir le Rule Builder
+2. Onglet "Test Center"
+3. Coller ces lignes de test :
+
+2026-04-01 18:00:01,Login,mahamadou.dansoko,WIN-5JRTS511MJA,mahamadou.dansoko,WIN-5JRTS511MJA,10.254.75.189,WIN-5JRTS511MJA,winlogon.exe,1234,0x4cbd6,Success
+2026-04-01 18:00:15,Login,admin,WIN-5JRTS511MJA,admin,WIN-5JRTS511MJA,10.254.75.200,WORKSTATION01,lsass.exe,5678,0x5def8,Failed
+2026-04-01 18:01:22,Logout,john.doe,DOMAIN01,john.doe,DOMAIN01,10.254.75.189,WIN-5JRTS511MJA,explorer.exe,2345,0x3abc9,Success
+2026-04-01 18:22:50,Logout,admin,WIN-5JRTS511MJA,administrator,WIN-5JRTS511MJA,10.254.75.201,LAPTOP-USER01,rundll32.exe,7078,0xddef6,Failed
+
+4. Cliquer sur "Test Selected"
+5. Vérifier que chaque log est parsé avec la bonne sub-rule
+
+
+### TEST 2 : GÉNÉRER DES LOGS
+### --------------------------
+
+1. Lancer le script PowerShell : Generate-EnrichedAuthLogs.ps1
+2. Choisir l'option 4 (Générer un lot de 10 événements)
+3. Attendre 2-3 minutes
+
+
+### TEST 3 : VÉRIFIER DANS INVESTIGATOR
+### -------------------------------------
+
+1. Ouvrir LogRhythm Investigator
+2. Chercher les logs récents
+3. Double-cliquer sur un log pour voir les détails
+4. Vérifier que TOUS ces champs sont remplis :
+
+   ✓ Classification         : Authentication
+   ✓ Common Event           : Logon-Success / Logon-Failed / etc.
+   ✓ MPE Rule               : Login Success Rule / etc.
+   ✓ User (Origin)          : [SubjectUser du CSV]
+   ✓ User (Impacted)        : [TargetUser du CSV]
+   ✓ Domain Origin          : [SubjectDomain du CSV]
+   ✓ Domain Impacted        : [TargetDomain du CSV]
+   ✓ Source IP              : [SourceIP du CSV]
+   ✓ Known Host             : [HostName du CSV]
+   ✓ Process Name           : [ProcessName du CSV]
+   ✓ Process ID             : [ProcessID du CSV]
+   ✓ Session                : [SessionID du CSV]
+   ✓ Result                 : [Status du CSV]
+
+
+## CHECKLIST DE VALIDATION COMPLÈTE
+## ==================================
+
+☐ Base-rule configurée avec les 12 groupes capturés
+☐ 4 Sub-rules créées (Login Success, Login Failed, Logout Success, Logout Failed)
+☐ Toutes les sub-rules testées dans Test Center
+☐ Policy sauvegardée et déployée
+☐ Service LogRhythm System Monitor redémarré
+☐ Log Source pointe vers C:\LogRhythmLogs\auth_logs
+☐ Policy "Auth Logs CSV Policy" assignée au Log Source
+☐ Logs générés avec le script PowerShell enrichi
+☐ Logs visibles dans Investigator
+☐ Classification = Authentication pour tous les logs
+☐ Common Event correctement assigné
+☐ Tous les 12 champs correctement parsés et visibles
+
+
+## AVANTAGES DU FORMAT ENRICHI
+## =============================
+
+✓ Compatible avec le mapping Windows Event XML
+✓ Distinction entre utilisateur source et cible
+✓ Informations de domaine pour détection cross-domain
+✓ Détails du processus pour analyse forensique
+✓ Session ID pour corrélation d'événements
+✓ Hostname pour identification de la machine
+✓ 12 champs au lieu de 5 → meilleure visibilité
+
+
+## COMPARAISON : ANCIEN vs NOUVEAU FORMAT
+## ========================================
+
+ANCIEN FORMAT (5 colonnes) :
+DateTime,EventType,Username,SourceIP,Status
+
+NOUVEAU FORMAT (12 colonnes) :
+DateTime,EventType,SubjectUser,SubjectDomain,TargetUser,TargetDomain,SourceIP,HostName,ProcessName,ProcessID,SessionID,Status
+
+Champs ajoutés :
++ SubjectDomain       : Domaine de l'utilisateur source
++ TargetUser          : Utilisateur cible (distinction source/cible)
++ TargetDomain        : Domaine cible
++ HostName            : Nom de la machine
++ ProcessName         : Processus impliqué
++ ProcessID           : ID du processus
++ SessionID           : ID de session
+
+
+## RÈGLES DE DÉTECTION RECOMMANDÉES
+## ==================================
+
+Avec ce format enrichi, vous pouvez créer des règles plus avancées :
+
+### RÈGLE 1 : Élévation de Privilèges
+Condition : SubjectUser != TargetUser ET Status = Success
+Détecte : Un utilisateur qui se connecte en tant qu'un autre utilisateur
+
+### RÈGLE 2 : Attaque Cross-Domain
+Condition : SubjectDomain != TargetDomain
+Détecte : Tentatives de connexion entre domaines différents
+
+### RÈGLE 3 : Processus Suspect
+Condition : ProcessName IN (cmd.exe, powershell.exe, rundll32.exe) ET Status = Failed
+Détecte : Tentatives échouées avec des processus souvent utilisés pour les attaques
+
+### RÈGLE 4 : Session Hijacking
+Condition : Même SessionID avec différents SourceIP
+Détecte : Un même ID de session utilisé depuis plusieurs IPs
+
+
+## FICHIERS FOURNIS
+## =================
+
+1. Generate-EnrichedAuthLogs.ps1        : Script PowerShell de génération
+2. auth_logs_enriched_example.csv       : Fichier d'exemple avec 30 logs
+3. Configuration_LogRhythm_Enrichi.txt  : Ce fichier de configuration
+4. (À venir) Document Word avec captures d'écran
+
+
+## SUPPORT ET DÉPANNAGE
+## =====================
+
+### Problème : La Base-rule ne parse pas
+Solution : Vérifiez que la regex est exactement comme spécifiée (pas d'espace en trop)
+
+### Problème : Certains champs restent vides
+Solution : Vérifiez que le fichier CSV a bien 12 colonnes et l'en-tête correct
+
+### Problème : Les logs n'arrivent pas
+Solution : 
+1. Vérifiez le chemin du fichier
+2. Redémarrez le service LogRhythm System Monitor
+3. Attendez 2-3 minutes
+
+### Problème : Classification vide
+Solution : Les sub-rules ne sont peut-être pas configurées ou pas sauvegardées
+
+
+## NOTES IMPORTANTES
+## ==================
+
+⚠️ ATTENTION : Ce nouveau format n'est PAS compatible avec l'ancien format 5 colonnes.
+   Vous devez réinitialiser votre fichier auth_logs et utiliser le nouveau script.
+
+⚠️ Si vous avez des règles de corrélation basées sur l'ancien format, vous devrez les mettre à jour.
+
+✅ Les avantages du format enrichi surpassent largement les inconvénients.
+
+✅ Ce format est beaucoup plus proche des vrais logs Windows Event, ce qui facilite
+   la création de règles réalistes.
+
+
+## FIN DU DOCUMENT
+## ================
+
+Pour toute question ou problème, référez-vous à ce document ou consultez
+la documentation LogRhythm officielle.
+
+Bonne configuration ! 🚀

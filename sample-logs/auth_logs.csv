@@ -1,0 +1,11 @@
+﻿DateTime,EventType,SubjectUser,SubjectDomain,TargetUser,TargetDomain,SourceIP,HostName,ProcessName,ProcessID,SessionID,Status
+2026-04-01 16:42:57,Login,jane.smith,DOMAIN01,jane.smith,DOMAIN01,10.254.75.101,SERVER01,taskmgr.exe,4219,0x238c5,Success
+2026-04-01 16:42:58,Logout,aissatou.ba,DOMAIN01,aissatou.ba,DOMAIN01,10.254.75.103,SERVER01,services.exe,4162,0x1d68d,Success
+2026-04-01 16:42:58,Login,guest,LOCALHOST,guest,LOCALHOST,10.254.75.204,WORKSTATION01,taskmgr.exe,9640,0x42332,Success
+2026-04-01 16:42:59,Login,john.doe,LOCALHOST,john.doe,LOCALHOST,10.254.75.101,WORKSTATION02,rundll32.exe,1845,0x9a1eb,Failed
+2026-04-01 16:42:59,Logout,ali.hamza,WIN-5JRTS511MJA,ali.hamza,WIN-5JRTS511MJA,10.254.75.101,WIN-5JRTS511MJA,rundll32.exe,6699,0x4e26d,Success
+2026-04-01 16:43:00,Login,ali.hamza,WIN-5JRTS511MJA,administrator,WIN-5JRTS511MJA,10.254.75.202,WORKSTATION01,rundll32.exe,4139,0x58714,Success
+2026-04-01 16:43:01,Login,jane.smith,LOCALHOST,jane.smith,LOCALHOST,10.254.75.102,WORKSTATION01,rundll32.exe,8394,0x30eec,Failed
+2026-04-01 16:43:01,Login,mahamadou.dansoko,WIN-5JRTS511MJA,mahamadou.dansoko,WIN-5JRTS511MJA,10.254.75.100,WORKSTATION01,powershell.exe,6237,0x3b26c,Success
+2026-04-01 16:43:02,Logout,svc.monitor,WORKGROUP,svc.monitor,WORKGROUP,10.254.75.201,LAPTOP-USER01,taskmgr.exe,8062,0x7b618,Success
+2026-04-01 16:43:02,Logout,aissatou.ba,WORKGROUP,aissatou.ba,WORKGROUP,10.254.75.50,LAPTOP-USER01,powershell.exe,3644,0xbbfa6,Success
